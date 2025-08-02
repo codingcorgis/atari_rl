@@ -24,6 +24,8 @@ from stable_baselines3.common.atari_wrappers import (
 )
 import matplotlib.pyplot as plt
 import torch
+from custom_reward_wrapper import CustomRewardWrapper
+
 
 # Set random seed for reproducibility
 set_random_seed(42)
@@ -166,7 +168,7 @@ class VideoRecorderCallback(BaseCallback):
             print(f"\nRecording video at episode {current_episode_count} ({self.num_timesteps} steps)...")
             
             # Create a temporary environment for video recording
-            env = gym.make('ALE/SpaceInvaders-v5', render_mode='rgb_array', frameskip=2)
+            env = gym.make('ALE/SpaceInvaders-v5', render_mode='rgb_array')
 
             # Apply Atari preprocessing
             env = gym.wrappers.AtariPreprocessing(env, 
@@ -174,7 +176,7 @@ class VideoRecorderCallback(BaseCallback):
                                                 grayscale_obs=True,
                                                 scale_obs=True,
                                                 terminal_on_life_loss=False)
-            env = gym.wrappers.FrameStackObservation(env, stack_size=4)
+            env = gym.wrappers.FrameStackObservation(env, stack_size=6)
             
             # Record video
             video_path = os.path.join(self.log_dir, "videos", f"space_invaders_episode_{current_episode_count}.avi")
@@ -297,14 +299,12 @@ def make_env():
         # Apply Atari preprocessing (no frame skipping to avoid conflicts)
         env = gym.wrappers.AtariPreprocessing(env, 
                                             frame_skip=1,  # No additional frame skipping
-                                            screen_size=84,
                                             grayscale_obs=True,
                                             scale_obs=True,
                                             terminal_on_life_loss=False)  # EpisodicLifeEnv handles this
         env = gym.wrappers.FrameStackObservation(env, stack_size=6)
         
         # Import and apply custom reward wrapper
-        from custom_reward_wrapper import CustomRewardWrapper
         env = CustomRewardWrapper(env)
         
         # Wrap with Monitor for proper episode tracking
@@ -339,7 +339,7 @@ def train_ppo():
     print("  - N steps: 2048 (increased for stability)")
     print("  - Batch size: 128 (increased)")
     print("  - N epochs: 10 (more epochs)")
-    print("  - Target KL: 0.01 (KL divergence control)")
+    print("  - Target KL: Removed (using standard PPO-Clip)")
     print("  - Network: Deeper architecture [256, 256]")
     print("=" * 60)
     
@@ -367,7 +367,7 @@ def train_ppo():
         vf_coef=0.5,
         max_grad_norm=0.5,
         use_sde=False,  # Disable SDE for discrete actions
-        target_kl=0.02,  # Add KL divergence target
+        # target_kl removed to use standard PPO-Clip instead of PPO-Penalty
         tensorboard_log="./logs/tensorboard_logs",
         verbose=1,
         device=device,  # Use GPU device
@@ -431,7 +431,7 @@ def train_ppo():
     print(f"  N epochs: 15 (more epochs)")
     print(f"  Entropy coefficient: 0.02 (increased for exploration)")
     print(f"  Clip range: 0.2 (fixed)")
-    print(f"  Target KL: 0.01 (KL divergence control)")
+    print(f"  Target KL: Removed (using standard PPO-Clip)")
     print(f"  Device: {device}")
     print(f"  Video recording: Every 100 episodes (until episode ends)")
     print(f"  Action diversity monitoring: Every 5000 steps")
@@ -475,7 +475,6 @@ def test_environment():
     # Apply Atari preprocessing (no frame skipping to avoid conflicts)
     env = gym.wrappers.AtariPreprocessing(env, 
                                         frame_skip=1,  # No additional frame skipping
-                                        screen_size=84,
                                         grayscale_obs=True,
                                         scale_obs=True,
                                         terminal_on_life_loss=False)  # EpisodicLifeEnv handles this
