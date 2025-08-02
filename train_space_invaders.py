@@ -18,6 +18,10 @@ from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.env_util import make_vec_env, make_atari_env
+from stable_baselines3.common.atari_wrappers import (
+    ClipRewardEnv, EpisodicLifeEnv, FireResetEnv, 
+    MaxAndSkipEnv, NoopResetEnv
+)
 import matplotlib.pyplot as plt
 import torch
 
@@ -279,22 +283,25 @@ class ProgressCallback(BaseCallback):
         return True
 
 def make_env():
-    """Create and wrap the SpaceInvaders environment with available Atari-specific wrappers and custom reward wrapper."""
+    """Create and wrap the SpaceInvaders environment with Atari-specific wrappers and custom reward wrapper."""
     def _make_env():
         # Create SpaceInvaders environment
         env = gym.make('ALE/SpaceInvaders-v5', repeat_action_probability=0.25)
 
-        # Apply available Atari-specific wrappers
-        env = gym.wrappers.MaxAndSkipObservation(env, skip=4)  # Skip frames and take max of last 2 frames
-        env = gym.wrappers.ClipReward(env, min_reward=-1, max_reward=1)  # Clip rewards to [-1, 1]
+        # Apply Atari-specific wrappers (in order of application)
+        env = NoopResetEnv(env, noop_max=30)  # Random NOOP actions at start
+        env = MaxAndSkipEnv(env, skip=4)  # Skip frames and take max of last 2 frames
+        env = ClipRewardEnv(env)  # Clip rewards to [-1, 1]
+        env = EpisodicLifeEnv(env)  # End episode on life loss
+        env = FireResetEnv(env)  # Fire action on reset for games that need it
         
         # Apply Atari preprocessing
         env = gym.wrappers.AtariPreprocessing(env, 
-                                            frame_skip=1,  # Disabled frame skipping since MaxAndSkipObservation handles it
+                                            frame_skip=1,  # Disabled frame skipping since MaxAndSkipEnv handles it
                                             screen_size=84,
                                             grayscale_obs=True,
                                             scale_obs=True,
-                                            terminal_on_life_loss=False)
+                                            terminal_on_life_loss=False)  # EpisodicLifeEnv handles this
         env = gym.wrappers.FrameStackObservation(env, stack_size=4)
         
         # Import and apply custom reward wrapper
@@ -320,8 +327,11 @@ def train_ppo():
     print("  - Inaction penalty: -0.1 after 5 consecutive NOOPs")
     print("  - Focused on event-based rewards to prevent reward hacking")
     print("ENHANCED ATARI WRAPPERS:")
-    print("  - MaxAndSkipObservation: Skip 4 frames, take max of last 2 frames")
-    print("  - ClipReward: Clip rewards to [-1, 1] range")
+    print("  - NoopResetEnv: Random NOOP actions (0-30) at episode start")
+    print("  - MaxAndSkipEnv: Skip 4 frames, take max of last 2 frames")
+    print("  - ClipRewardEnv: Clip rewards to [-1, 1] range")
+    print("  - EpisodicLifeEnv: End episode on life loss")
+    print("  - FireResetEnv: Fire action on reset for games that need it")
     print("OPTIMIZED TRAINING PARAMETERS:")
     print("  - Learning rate: 5e-4 (fixed)")
     print("  - Entropy coefficient: 0.01 (fixed)")
@@ -456,9 +466,12 @@ def test_environment():
     # Create environment using the same wrapper setup as training
     env = gym.make('ALE/SpaceInvaders-v5', repeat_action_probability=0.25)
     
-    # Apply available Atari-specific wrappers
-    env = gym.wrappers.MaxAndSkipObservation(env, skip=4)  # Skip frames and take max of last 2 frames
-    env = gym.wrappers.ClipReward(env, min_reward=-1, max_reward=1)  # Clip rewards to [-1, 1]
+    # Apply Atari-specific wrappers (in order of application)
+    env = NoopResetEnv(env, noop_max=30)  # Random NOOP actions at start
+    env = MaxAndSkipEnv(env, skip=4)  # Skip frames and take max of last 2 frames
+    env = ClipRewardEnv(env)  # Clip rewards to [-1, 1]
+    env = EpisodicLifeEnv(env)  # End episode on life loss
+    env = FireResetEnv(env)  # Fire action on reset for games that need it
     
     # Apply Atari preprocessing
     env = gym.wrappers.AtariPreprocessing(env, 
