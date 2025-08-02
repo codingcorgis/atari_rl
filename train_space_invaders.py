@@ -290,12 +290,13 @@ def make_env():
 
         # Apply Atari-specific wrappers (in order of application)
         env = NoopResetEnv(env, noop_max=30)  # Random NOOP actions at start
+        env = MaxAndSkipEnv(env, skip=4)  # Skip 4 frames, take max of last 2 frames
         env = EpisodicLifeEnv(env)  # End episode on life loss
         env = FireResetEnv(env)  # Fire action on reset for games that need it
         
-        # Apply Atari preprocessing
+        # Apply Atari preprocessing (no frame skipping to avoid conflicts)
         env = gym.wrappers.AtariPreprocessing(env, 
-                                            frame_skip=1,  # Minimal frame skipping
+                                            frame_skip=1,  # No additional frame skipping
                                             screen_size=84,
                                             grayscale_obs=True,
                                             scale_obs=True,
@@ -327,9 +328,10 @@ def train_ppo():
     print("ENHANCED ATARI WRAPPERS:")
     print("  - NoopResetEnv: Random NOOP actions (0-30) at episode start")
     print("  - MaxAndSkipEnv: Skip 4 frames, take max of last 2 frames")
-    print("  - ClipRewardEnv: Clip rewards to [-1, 1] range")
     print("  - EpisodicLifeEnv: End episode on life loss")
     print("  - FireResetEnv: Fire action on reset for games that need it")
+    print("  - AtariPreprocessing: Frame resizing, grayscale, normalization")
+    print("  - FrameStackObservation: 6-frame temporal context")
     print("OPTIMIZED TRAINING PARAMETERS:")
     print("  - Learning rate: 5e-4 (fixed)")
     print("  - Entropy coefficient: 0.01 (fixed)")
@@ -466,12 +468,13 @@ def test_environment():
     
     # Apply Atari-specific wrappers (in order of application)
     env = NoopResetEnv(env, noop_max=30)  # Random NOOP actions at start
+    env = MaxAndSkipEnv(env, skip=4)  # Skip 4 frames, take max of last 2 frames
     env = EpisodicLifeEnv(env)  # End episode on life loss
     env = FireResetEnv(env)  # Fire action on reset for games that need it
     
-    # Apply Atari preprocessing
+    # Apply Atari preprocessing (no frame skipping to avoid conflicts)
     env = gym.wrappers.AtariPreprocessing(env, 
-                                        frame_skip=1,  # Minimal frame skipping
+                                        frame_skip=1,  # No additional frame skipping
                                         screen_size=84,
                                         grayscale_obs=True,
                                         scale_obs=True,
