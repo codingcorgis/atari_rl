@@ -1,6 +1,6 @@
-# Reinforcement Learning Training Setup
+# Atari Reinforcement Learning Training Setup
 
-This repository contains scripts for training PPO agents on various environments, including Atari games and classic RL environments.
+This repository contains scripts for training PPO agents on Atari games, specifically SpaceInvaders, with custom reward wrappers and comprehensive training utilities.
 
 ## Setup
 
@@ -14,47 +14,8 @@ This repository contains scripts for training PPO agents on various environments
 
 ## Available Training Scripts
 
-### 1. CartPole Training (`train_cartpole_simple.py`)
-A working PPO training script for the CartPole environment.
-
-**Usage:**
-```bash
-# Activate virtual environment
-rl_env\Scripts\activate
-
-# Test the environment
-python train_cartpole_simple.py --mode test
-
-# Train the agent
-python train_cartpole_simple.py --mode train
-
-# Evaluate a trained model
-python train_cartpole_simple.py --mode evaluate --model-path ./logs/final_model
-```
-
-### 2. CartPole Training - Complete Version (`train_cartpole_final.py`)
-A comprehensive PPO training script for CartPole with progress tracking and evaluation.
-
-**Usage:**
-```bash
-# Activate virtual environment
-rl_env\Scripts\activate
-
-# Test the environment
-python train_cartpole_final.py --mode test
-
-# Train the agent
-python train_cartpole_final.py --mode train
-
-# Evaluate a trained model
-python train_cartpole_final.py --mode evaluate --model-path ./logs/final_model
-
-# List available environments
-python train_cartpole_final.py --mode list
-```
-
-### 3. SpaceInvaders Training (`train_space_invaders.py`)
-A comprehensive PPO training script for SpaceInvaders with progress tracking and video recording.
+### 1. SpaceInvaders Training (`train_space_invaders.py`)
+A comprehensive PPO training script for SpaceInvaders with progress tracking, video recording, and custom reward wrapper.
 
 **Usage:**
 ```bash
@@ -74,13 +35,15 @@ python train_space_invaders.py --mode train
 python train_space_invaders.py --mode evaluate --model-path ./logs/final_model
 ```
 
-### 4. Demo Training (`demo_training.py`)
-A minimal demo script for quick CartPole training verification.
+## Core Files
 
-**Usage:**
-```bash
-python demo_training.py
-```
+### Training Scripts
+- **`train_space_invaders.py`** - Main training script for SpaceInvaders with PPO
+- **`custom_reward_wrapper.py`** - Custom reward wrapper for enhanced training
+
+### Analysis and Visualization
+- **`plot_training_progress.py`** - Script to plot and analyze training progress
+- **`render_best_policy.py`** - Script to render the best trained policy
 
 ## Features
 
@@ -108,16 +71,24 @@ python demo_training.py
 
 ### PPO Configuration
 - **Learning Rate**: 3e-4
-- **Batch Size**: 64
-- **N Steps**: 128
-- **N Epochs**: 4
+- **Batch Size**: 256
+- **N Steps**: 2048
+- **N Epochs**: 15
 - **Gamma**: 0.99
-- **Entropy Coefficient**: 0.01
+- **Entropy Coefficient**: 0.02
 - **Clip Range**: 0.2
 
 ### Environment Configuration
-- **CartPole**: 4 parallel environments
 - **SpaceInvaders**: 4 parallel environments with frame stacking (4 frames)
+- **Custom Reward Wrapper**: Enhanced reward system for better learning
+
+## Custom Reward System
+
+The training uses a custom reward wrapper (`custom_reward_wrapper.py`) that provides:
+- **Score bonus**: +2.0x for scoring points
+- **Life loss penalty**: -100 for losing a life
+- **Inaction penalty**: -0.1 after 5 consecutive NOOPs
+- **Event-based rewards**: Focused on preventing reward hacking
 
 ## Output Structure
 
@@ -139,8 +110,8 @@ The Atari environments are now working! Make sure to:
 1. **Import ale_py**: All scripts include `import ale_py` to register ALE environments
 2. **Check available environments**:
    ```bash
-python train_space_invaders.py --mode list
-```
+   python train_space_invaders.py --mode list
+   ```
 
 3. **If Atari ROMs are not working**:
    ```bash
@@ -151,7 +122,7 @@ python train_space_invaders.py --mode list
 ### Environment Issues
 - Ensure the virtual environment is activated: `rl_env\Scripts\activate`
 - Check that all dependencies are installed: `pip list`
-- Test with CartPole first before trying Atari environments
+- Test the environment first: `python train_space_invaders.py --mode test`
 
 ## Popular Atari Games for Training
 
@@ -168,16 +139,16 @@ python train_space_invaders.py --mode list
 
 ## Training Tips
 
-1. **Start Simple**: Begin with CartPole to verify your setup works
-2. **Monitor Progress**: Use TensorBoard to visualize training: `tensorboard --logdir ./logs/tensorboard_logs`
-3. **Save Checkpoints**: Models are automatically saved, so you can resume training
-4. **Video Review**: Check the videos folder to see how your agent improves over time
-5. **Evaluation**: Regularly evaluate your model to track performance
+1. **Monitor Progress**: Use TensorBoard to visualize training: `tensorboard --logdir ./logs/tensorboard_logs`
+2. **Save Checkpoints**: Models are automatically saved, so you can resume training
+3. **Video Review**: Check the videos folder to see how your agent improves over time
+4. **Evaluation**: Regularly evaluate your model to track performance
+5. **Custom Rewards**: The custom reward wrapper helps with better learning behavior
 
 ## Next Steps
 
-1. **Test CartPole Training**: Run the CartPole script to verify everything works
-2. **Install Atari ROMs**: Follow the troubleshooting steps above
-3. **Train SpaceInvaders**: Once ROMs are installed, train on SpaceInvaders
-4. **Experiment**: Try different hyperparameters and environments
-5. **Visualize**: Use TensorBoard to analyze training progress 
+1. **Test the Environment**: Run `python train_space_invaders.py --mode test`
+2. **Start Training**: Run `python train_space_invaders.py --mode train`
+3. **Monitor Progress**: Use TensorBoard to track training progress
+4. **Analyze Results**: Use the analysis scripts to understand agent behavior
+5. **Experiment**: Try different hyperparameters and environments 
