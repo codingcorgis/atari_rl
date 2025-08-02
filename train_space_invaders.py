@@ -290,19 +290,17 @@ def make_env():
 
         # Apply Atari-specific wrappers (in order of application)
         env = NoopResetEnv(env, noop_max=30)  # Random NOOP actions at start
-        env = MaxAndSkipEnv(env, skip=4)  # Skip frames and take max of last 2 frames
-        env = ClipRewardEnv(env)  # Clip rewards to [-1, 1]
         env = EpisodicLifeEnv(env)  # End episode on life loss
         env = FireResetEnv(env)  # Fire action on reset for games that need it
         
         # Apply Atari preprocessing
         env = gym.wrappers.AtariPreprocessing(env, 
-                                            frame_skip=1,  # Disabled frame skipping since MaxAndSkipEnv handles it
+                                            frame_skip=1,  # Minimal frame skipping
                                             screen_size=84,
                                             grayscale_obs=True,
                                             scale_obs=True,
                                             terminal_on_life_loss=False)  # EpisodicLifeEnv handles this
-        env = gym.wrappers.FrameStackObservation(env, stack_size=4)
+        env = gym.wrappers.FrameStackObservation(env, stack_size=6)
         
         # Import and apply custom reward wrapper
         from custom_reward_wrapper import CustomRewardWrapper
@@ -468,19 +466,17 @@ def test_environment():
     
     # Apply Atari-specific wrappers (in order of application)
     env = NoopResetEnv(env, noop_max=30)  # Random NOOP actions at start
-    env = MaxAndSkipEnv(env, skip=4)  # Skip frames and take max of last 2 frames
-    env = ClipRewardEnv(env)  # Clip rewards to [-1, 1]
     env = EpisodicLifeEnv(env)  # End episode on life loss
     env = FireResetEnv(env)  # Fire action on reset for games that need it
     
     # Apply Atari preprocessing
     env = gym.wrappers.AtariPreprocessing(env, 
-                                        frame_skip=1,  # Disabled frame skipping since MaxAndSkipObservation handles it
+                                        frame_skip=1,  # Minimal frame skipping
                                         screen_size=84,
                                         grayscale_obs=True,
                                         scale_obs=True,
-                                        terminal_on_life_loss=False)
-    env = gym.wrappers.FrameStackObservation(env, stack_size=4)
+                                        terminal_on_life_loss=False)  # EpisodicLifeEnv handles this
+    env = gym.wrappers.FrameStackObservation(env, stack_size=6)
     
     # Import and apply custom reward wrapper
     from custom_reward_wrapper import CustomRewardWrapper
