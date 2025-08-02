@@ -162,7 +162,7 @@ class VideoRecorderCallback(BaseCallback):
             print(f"\nRecording video at episode {current_episode_count} ({self.num_timesteps} steps)...")
             
             # Create a temporary environment for video recording
-            env = gym.make('ALE/SpaceInvaders-v5', render_mode='rgb_array', frameskip=1)
+            env = gym.make('ALE/SpaceInvaders-v5', render_mode='rgb_array', frameskip=2)
 
             # Apply Atari preprocessing
             env = gym.wrappers.AtariPreprocessing(env, 
@@ -279,14 +279,19 @@ class ProgressCallback(BaseCallback):
         return True
 
 def make_env():
-    """Create and wrap the SpaceInvaders environment with Monitor and CustomRewardWrapper."""
+    """Create and wrap the SpaceInvaders environment with available Atari-specific wrappers and custom reward wrapper."""
     def _make_env():
         # Create SpaceInvaders environment
         env = gym.make('ALE/SpaceInvaders-v5', repeat_action_probability=0.25)
 
+        # Apply available Atari-specific wrappers
+        env = gym.wrappers.MaxAndSkipObservation(env, skip=4)  # Skip frames and take max of last 2 frames
+        env = gym.wrappers.ClipReward(env, min_reward=-1, max_reward=1)  # Clip rewards to [-1, 1]
+        
         # Apply Atari preprocessing
         env = gym.wrappers.AtariPreprocessing(env, 
-                                            frame_skip=1,
+                                            frame_skip=1,  # Disabled frame skipping since MaxAndSkipObservation handles it
+                                            screen_size=84,
                                             grayscale_obs=True,
                                             scale_obs=True,
                                             terminal_on_life_loss=False)
@@ -314,6 +319,9 @@ def train_ppo():
     print("  - Life loss penalty: -100 for losing a life")
     print("  - Inaction penalty: -0.1 after 5 consecutive NOOPs")
     print("  - Focused on event-based rewards to prevent reward hacking")
+    print("ENHANCED ATARI WRAPPERS:")
+    print("  - MaxAndSkipObservation: Skip 4 frames, take max of last 2 frames")
+    print("  - ClipReward: Clip rewards to [-1, 1] range")
     print("OPTIMIZED TRAINING PARAMETERS:")
     print("  - Learning rate: 5e-4 (fixed)")
     print("  - Entropy coefficient: 0.01 (fixed)")
@@ -339,13 +347,13 @@ def train_ppo():
         learning_rate=linear_schedule(2.5e-4, 1e-5),  # Slightly lower learning rate for more stable learning
         n_steps=2048,  # Increased for better stability
         batch_size=256,  # Larger batch size for better gradient estimates
-        n_epochs=15,  # More epochs for better learning
+        n_epochs=10,  # More epochs for better learning
         gamma=0.99,
         gae_lambda=0.95,
         clip_range=0.2,  # Fixed clip range to avoid function issues
         clip_range_vf=None,
         normalize_advantage=True,
-        ent_coef=0.02,  # Increased entropy coefficient for better exploration
+        ent_coef=0.03,  # Increased entropy coefficient for better exploration
         vf_coef=0.5,
         max_grad_norm=0.5,
         use_sde=False,  # Disable SDE for discrete actions
@@ -369,7 +377,7 @@ def train_ppo():
     progress_callback = ProgressCallback(log_dir="./logs")
     
     checkpoint_callback = CheckpointCallback(
-        save_freq=50000,
+        save_freq=100000,
         save_path="./logs/checkpoints",
         name_prefix="ppo_space_invaders"
     )
@@ -427,7 +435,7 @@ def train_ppo():
     callbacks = [progress_callback, checkpoint_callback, eval_callback, video_callback, diversity_callback]
     
     model.learn(
-        total_timesteps=12000000,  # Increased training time for better convergence
+        total_timesteps=120000000,  # Increased training time for better convergence
         callback=callbacks,
         progress_bar=True
     )
@@ -445,10 +453,17 @@ def test_environment():
     """Test the SpaceInvaders environment to verify it's working correctly."""
     print("Testing SpaceInvaders environment...")
     
-    # Create environment
+    # Create environment using the same wrapper setup as training
     env = gym.make('ALE/SpaceInvaders-v5', repeat_action_probability=0.25)
+    
+    # Apply available Atari-specific wrappers
+    env = gym.wrappers.MaxAndSkipObservation(env, skip=4)  # Skip frames and take max of last 2 frames
+    env = gym.wrappers.ClipReward(env, min_reward=-1, max_reward=1)  # Clip rewards to [-1, 1]
+    
+    # Apply Atari preprocessing
     env = gym.wrappers.AtariPreprocessing(env, 
-                                        frame_skip=1,
+                                        frame_skip=1,  # Disabled frame skipping since MaxAndSkipObservation handles it
+                                        screen_size=84,
                                         grayscale_obs=True,
                                         scale_obs=True,
                                         terminal_on_life_loss=False)
