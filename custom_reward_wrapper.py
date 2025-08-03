@@ -30,9 +30,9 @@ class CustomRewardWrapper(gym.Wrapper):
 
     def step(self, action):
         """Take a step and apply the rebalanced, event-based reward function."""
-        obs, reward, terminated, truncated, info = self.env.step(action)
-
-        current_score = info.get('score', 0)
+        obs, original_reward, terminated, truncated, info = self.env.step(action)
+        ram = self.env.unwrapped.ale.getRAM()
+        current_score = original_reward
         current_lives = info.get('lives', 0)
 
         # --- 1. Primary Positive Reward: MASSIVE Score Bonus ---
@@ -43,11 +43,14 @@ class CustomRewardWrapper(gym.Wrapper):
         if score_delta > 0:
             # We make the bonus a substantial fraction of the life penalty.
             # A standard alien is now worth 50-300 points in reward.
-            score_bonus = score_delta * 10.0
+            score_bonus = score_delta * 5.0
 
         # --- 2. Primary Negative Reward: Life Loss Penalty ---
         # This remains the main driver for learning survival.
-        life_penalty = -100.0 if current_lives < self.last_lives else 0
+        if current_lives < self.last_lives:
+            life_penalty = -100.0
+        else:
+            life_penalty = 0
 
         # Update state for the next step
         self.last_score = current_score
