@@ -19,9 +19,9 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.env_util import make_vec_env, make_atari_env
 from stable_baselines3.common.atari_wrappers import (
-    ClipRewardEnv, EpisodicLifeEnv, FireResetEnv, 
-    MaxAndSkipEnv, NoopResetEnv
+    NoopResetEnv, MaxAndSkipEnv, EpisodicLifeEnv, FireResetEnv
 )
+
 import matplotlib.pyplot as plt
 import torch
 from custom_reward_wrapper import CustomRewardWrapper
@@ -167,16 +167,51 @@ class VideoRecorderCallback(BaseCallback):
             
             print(f"\nRecording video at episode {current_episode_count} ({self.num_timesteps} steps)...")
             
-            # Create a temporary environment for video recording
-            env = gym.make('ALE/SpaceInvaders-v5', render_mode='rgb_array')
-
-            # Apply Atari preprocessing
-            env = gym.wrappers.AtariPreprocessing(env, 
-                                                frame_skip=1,
-                                                grayscale_obs=True,
-                                                scale_obs=True,
-                                                terminal_on_life_loss=False)
+            # Create a temporary environment for video recording that matches training environment exactly
+            # Create the base environment with render mode for video capture
+            env = gym.make('ALE/SpaceInvaders-v5', 
+                         repeat_action_probability=0.25,
+                         render_mode='rgb_array')
+            
+            # Apply the same wrappers as training environment exactly
+            # Apply standard Atari wrappers explicitly
+            env = NoopResetEnv(env, noop_max=30)
+            env = MaxAndSkipEnv(env, skip=4)
+            env = EpisodicLifeEnv(env)
+            
+            # Apply Atari preprocessing explicitly
+            env = gym.wrappers.AtariPreprocessing(
+                env,
+                frame_skip=1,  # Already handled by MaxAndSkipEnv
+                screen_size=84,
+                grayscale_obs=True,
+                scale_obs=True,
+                terminal_on_life_loss=False  # Already handled by EpisodicLifeEnv
+            )
+            
+            # Apply custom reward wrapper
+            env = CustomRewardWrapper(env)
+            
+            # Apply frame stacking
             env = gym.wrappers.FrameStackObservation(env, stack_size=6)
+            
+            # Ensure observation compatibility with CnnPolicy
+            if env.observation_space.shape[-1] == 1:
+                class SqueezeWrapper(gym.ObservationWrapper):
+                    def __init__(self, env):
+                        super().__init__(env)
+                        old_shape = env.observation_space.shape
+                        new_shape = old_shape[:-1]
+                        self.observation_space = gym.spaces.Box(
+                            low=env.observation_space.low.reshape(new_shape),
+                            high=env.observation_space.high.reshape(new_shape),
+                            dtype=env.observation_space.dtype
+                        )
+                    
+                    def observation(self, obs):
+                        return obs.squeeze(-1)
+                
+                env = SqueezeWrapper(env)
             
             # Record video
             video_path = os.path.join(self.log_dir, "videos", f"space_invaders_episode_{current_episode_count}.avi")
@@ -285,33 +320,54 @@ class ProgressCallback(BaseCallback):
         return True
 
 def make_env():
-    """Create and wrap the SpaceInvaders environment with Atari-specific wrappers and custom reward wrapper."""
+    """Explicitly create and wrap the SpaceInvaders environment with standard Atari wrappers, custom reward wrapper, and frame stacking."""
     def _make_env():
-        # Create SpaceInvaders environment
         env = gym.make('ALE/SpaceInvaders-v5', repeat_action_probability=0.25)
 
-        # Apply Atari-specific wrappers (in order of application)
-        env = NoopResetEnv(env, noop_max=30)  # Random NOOP actions at start
-        env = MaxAndSkipEnv(env, skip=4)  # Skip 4 frames, take max of last 2 frames
-        env = EpisodicLifeEnv(env)  # End episode on life loss
-        env = FireResetEnv(env)  # Fire action on reset for games that need it
-        
-        # Apply Atari preprocessing (no frame skipping to avoid conflicts)
-        env = gym.wrappers.AtariPreprocessing(env, 
-                                            frame_skip=1,  # No additional frame skipping
-                                            grayscale_obs=True,
-                                            scale_obs=True,
-                                            terminal_on_life_loss=False)  # EpisodicLifeEnv handles this
-        env = gym.wrappers.FrameStackObservation(env, stack_size=6)
-        
-        # Import and apply custom reward wrapper
+        # Apply standard Atari wrappers explicitly
+        env = NoopResetEnv(env, noop_max=30)
+        env = MaxAndSkipEnv(env, skip=4)
+        env = EpisodicLifeEnv(env)
+
+        # Apply Atari preprocessing explicitly
+        env = gym.wrappers.AtariPreprocessing(
+            env,
+            frame_skip=1,  # Already handled by MaxAndSkipEnv
+            screen_size=84,
+            grayscale_obs=True,
+            scale_obs=True,
+            terminal_on_life_loss=False  # Already handled by EpisodicLifeEnv
+        )
+
+        # Apply custom reward wrapper
         env = CustomRewardWrapper(env)
-        
-        # Wrap with Monitor for proper episode tracking
+
+        # Apply frame stacking
+        env = gym.wrappers.FrameStackObservation(env, stack_size=6)
+
+        # Ensure observation compatibility with CnnPolicy
+        if env.observation_space.shape[-1] == 1:
+            class SqueezeWrapper(gym.ObservationWrapper):
+                def __init__(self, env):
+                    super().__init__(env)
+                    old_shape = env.observation_space.shape
+                    new_shape = old_shape[:-1]
+                    self.observation_space = gym.spaces.Box(
+                        low=env.observation_space.low.reshape(new_shape),
+                        high=env.observation_space.high.reshape(new_shape),
+                        dtype=env.observation_space.dtype
+                    )
+
+                def observation(self, obs):
+                    return obs.squeeze(-1)
+
+            env = SqueezeWrapper(env)
+
+        # Wrap environment with Monitor for logging
         env = Monitor(env)
-        
+
         return env
-    
+
     return _make_env
 
 def train_ppo():
@@ -325,22 +381,23 @@ def train_ppo():
     print("  - Life loss penalty: -100 for losing a life")
     print("  - Inaction penalty: -0.1 after 5 consecutive NOOPs")
     print("  - Focused on event-based rewards to prevent reward hacking")
-    print("ENHANCED ATARI WRAPPERS:")
+    print("STANDARD ATARI WRAPPERS (explicit setup):")
     print("  - NoopResetEnv: Random NOOP actions (0-30) at episode start")
     print("  - MaxAndSkipEnv: Skip 4 frames, take max of last 2 frames")
     print("  - EpisodicLifeEnv: End episode on life loss")
-    print("  - FireResetEnv: Fire action on reset for games that need it")
     print("  - AtariPreprocessing: Frame resizing, grayscale, normalization")
+    print("  - CustomRewardWrapper: Enhanced reward shaping")
     print("  - FrameStackObservation: 6-frame temporal context")
+    print("  - Monitor: Episode tracking and logging")
     print("OPTIMIZED TRAINING PARAMETERS:")
-    print("  - Learning rate: 5e-4 (fixed)")
-    print("  - Entropy coefficient: 0.01 (fixed)")
+    print("  - Learning rate: 2.5e-4 to 1e-5 (linear schedule)")
+    print("  - Entropy coefficient: 0.04 (increased for exploration)")
     print("  - Clip range: 0.2 (fixed)")
     print("  - N steps: 2048 (increased for stability)")
-    print("  - Batch size: 128 (increased)")
+    print("  - Batch size: 256 (larger for better gradients)")
     print("  - N epochs: 10 (more epochs)")
     print("  - Target KL: Removed (using standard PPO-Clip)")
-    print("  - Network: Deeper architecture [256, 256]")
+    print("  - Network: Deeper architecture [512, 256]")
     print("=" * 60)
     
     # Create environment using make_vec_env with custom environment function
@@ -363,11 +420,10 @@ def train_ppo():
         clip_range=0.2,  # Fixed clip range to avoid function issues
         clip_range_vf=None,
         normalize_advantage=True,
-        ent_coef=0.03,  # Increased entropy coefficient for better exploration
+        ent_coef=0.04,  # Increased entropy coefficient for better exploration
         vf_coef=0.5,
         max_grad_norm=0.5,
         use_sde=False,  # Disable SDE for discrete actions
-        # target_kl removed to use standard PPO-Clip instead of PPO-Penalty
         tensorboard_log="./logs/tensorboard_logs",
         verbose=1,
         device=device,  # Use GPU device
@@ -425,11 +481,11 @@ def train_ppo():
     # Train the model
     print("Training started with ENHANCED parameters:")
     print(f"  Policy: CnnPolicy with deeper architecture")
-    print(f"  Learning rate: 3e-4 (reduced for stability)")
+    print(f"  Learning rate: 2.5e-4 to 1e-5 (linear schedule)")
     print(f"  Batch size: 256 (larger for better gradients)")
     print(f"  N steps: 2048 (increased for stability)")
-    print(f"  N epochs: 15 (more epochs)")
-    print(f"  Entropy coefficient: 0.02 (increased for exploration)")
+    print(f"  N epochs: 10 (more epochs)")
+    print(f"  Entropy coefficient: 0.04 (increased for exploration)")
     print(f"  Clip range: 0.2 (fixed)")
     print(f"  Target KL: Removed (using standard PPO-Clip)")
     print(f"  Device: {device}")
@@ -463,26 +519,8 @@ def test_environment():
     """Test the SpaceInvaders environment to verify it's working correctly."""
     print("Testing SpaceInvaders environment...")
     
-    # Create environment using the same wrapper setup as training
-    env = gym.make('ALE/SpaceInvaders-v5', repeat_action_probability=0.25)
-    
-    # Apply Atari-specific wrappers (in order of application)
-    env = NoopResetEnv(env, noop_max=30)  # Random NOOP actions at start
-    env = MaxAndSkipEnv(env, skip=4)  # Skip 4 frames, take max of last 2 frames
-    env = EpisodicLifeEnv(env)  # End episode on life loss
-    env = FireResetEnv(env)  # Fire action on reset for games that need it
-    
-    # Apply Atari preprocessing (no frame skipping to avoid conflicts)
-    env = gym.wrappers.AtariPreprocessing(env, 
-                                        frame_skip=1,  # No additional frame skipping
-                                        grayscale_obs=True,
-                                        scale_obs=True,
-                                        terminal_on_life_loss=False)  # EpisodicLifeEnv handles this
-    env = gym.wrappers.FrameStackObservation(env, stack_size=6)
-    
-    # Import and apply custom reward wrapper
-    from custom_reward_wrapper import CustomRewardWrapper
-    env = CustomRewardWrapper(env)
+    # Use the same environment setup as training
+    env = make_env()()
     
     # Test environment
     obs, _ = env.reset()

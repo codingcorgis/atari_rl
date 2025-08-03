@@ -16,7 +16,7 @@ model = PPO.load(model_path)
 #env = gym.make('ALE/SpaceInvaders-v5', render_mode='rgb_array')
 env = gym.make('SpaceInvadersNoFrameskip-v4', render_mode='rgb_array')
 
-env = gym.wrappers.AtariPreprocessing(env, frame_skip=1, grayscale_obs=True, scale_obs=True, terminal_on_life_loss=True)
+env = gym.wrappers.AtariPreprocessing(env, frame_skip=1, grayscale_obs=True, scale_obs=True, terminal_on_life_loss=False)
 env = gym.wrappers.FrameStackObservation(env, stack_size=4)
 
 # Prepare video writer

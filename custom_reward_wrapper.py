@@ -29,47 +29,36 @@ class CustomRewardWrapper(gym.Wrapper):
         return obs, info
 
     def step(self, action):
-        """Take a step and apply the refined, event-based reward function."""
+        """Take a step and apply the rebalanced, event-based reward function."""
         obs, reward, terminated, truncated, info = self.env.step(action)
 
         current_score = info.get('score', 0)
         current_lives = info.get('lives', 0)
 
-        # --- Primary Positive Reward: Scoring Points ---
-        # A strong, direct reward for the main objective.
-        # We multiply the score delta to make it more significant than small penalties.
-        score_bonus = (current_score - self.last_score) * 2.0
+        # --- 1. Primary Positive Reward: MASSIVE Score Bonus ---
+        # The reward for hitting an alien needs to be significant enough to
+        # justify the risk of moving and shooting.
+        score_bonus = 0
+        score_delta = current_score - self.last_score
+        if score_delta > 0:
+            # We make the bonus a substantial fraction of the life penalty.
+            # A standard alien is now worth 50-300 points in reward.
+            score_bonus = score_delta * 10.0
 
-        # --- Primary Negative Reward: Losing a Life ---
-        # A large, unambiguous penalty that is the main driver for learning survival.
+        # --- 2. Primary Negative Reward: Life Loss Penalty ---
+        # This remains the main driver for learning survival.
         life_penalty = -100.0 if current_lives < self.last_lives else 0
-
-        # --- Nudge Penalty: Discourage Inaction ---
-        # A small penalty to prevent the agent from getting stuck doing nothing.
-        inaction_penalty = 0
-        if action == 0: # NOOP action
-            self.consecutive_noops += 1
-            # Apply penalty only after several consecutive NOOPs
-            if self.consecutive_noops > 5:
-                inaction_penalty = -0.1
-        else:
-            self.consecutive_noops = 0
-
-        # --- Combine the clear, event-based rewards ---
-        # Note: We remove the constant 'survival' and 'movement' bonuses.
-        # The agent must now learn to move and survive as a *strategy* to
-        # get the score_bonus and avoid the life_penalty.
-        custom_reward = (
-            score_bonus +
-            life_penalty +
-            inaction_penalty
-        )
 
         # Update state for the next step
         self.last_score = current_score
         self.last_lives = current_lives
 
-        return obs, custom_reward, terminated, truncated, info
+        # The total reward is now simple, powerful, and event-driven.
+        # The agent must learn that the only way to get a positive total reward
+        # is to score points while avoiding the life penalty.
+        total_reward = score_bonus + life_penalty
+
+        return obs, total_reward, terminated, truncated, info
 
 
 def test_custom_reward():
